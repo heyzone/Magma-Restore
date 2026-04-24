@@ -36,58 +36,31 @@ jobs:
 
       # =========================
       # 系统依赖
-      # xvfb + pulseaudio（Buster 音频需要）
+      # xvfb（patchright headed 模式必须）
       # =========================
       - name: 安装系统依赖
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y \
-            xvfb wget unzip curl jq p7zip-full \
-            pulseaudio alsa-utils ffmpeg
-
-          pulseaudio --start --exit-idle-time=-1 || true
-          sleep 1
-          pactl load-module module-null-sink \
-            sink_name=virtual_speaker \
-            sink_properties=device.description=VirtualSpeaker || true
-          pactl set-default-sink virtual_speaker || true
-          pactl load-module module-virtual-source \
-            source_name=virtual_mic \
-            master=virtual_speaker.monitor || true
-          pactl set-default-source virtual_mic || true
-          echo "🔊 虚拟音频就绪"
+            xvfb wget unzip curl jq \
+            libnss3 libatk1.0-0 libatk-bridge2.0-0 \
+            libcups2 libdrm2 libxkbcommon0 libxcomposite1 \
+            libxdamage1 libxfixes3 libxrandr2 libgbm1 \
+            libasound2 libpango-1.0-0 libcairo2
+          echo "✅ 系统依赖安装完成"
 
       # =========================
       # Node 依赖
-      # playwright  : 登录页 reCAPTCHA + Buster
-      # patchright  : bypass.city Turnstile（主方案）
+      # patchright：处理 Cloudflare Turnstile（登录页）
+      # form-data：TG 发送截图
       # =========================
       - name: 安装 Node 依赖
         run: |
           cd scripts
           npm init -y
-          npm install playwright patchright
-          npx playwright install chromium
-          npx playwright install-deps chromium
+          npm install patchright form-data
           npx patchright install chrome
-          echo "✅ playwright + patchright 安装完成"
-
-      # =========================
-      # Buster 扩展（登录页 reCAPTCHA）
-      # =========================
-      - name: 下载 Buster 扩展
-        run: |
-          mkdir -p scripts/extensions/buster
-          wget -q -O scripts/extensions/buster/buster.zip \
-            https://github.com/dessant/buster/releases/download/v3.1.2/buster_captcha_solver_for_humans-3.1.2-chrome.zip
-
-      - name: 解压 Buster 扩展
-        run: |
-          mkdir -p scripts/extensions/buster/unpacked
-          7z x -y scripts/extensions/buster/buster.zip \
-            -oscripts/extensions/buster/unpacked > /dev/null
-          ls scripts/extensions/buster/unpacked/manifest.json && \
-            echo "✅ Buster OK" || echo "❌ Buster manifest 缺失"
+          echo "✅ patchright 安装完成"
 
       # =========================
       # 准备脚本
@@ -104,19 +77,15 @@ jobs:
 
       # =========================
       # 运行
-      # 浏览器实例说明：
-      #   [1] Playwright + Buster  → 登录 reCAPTCHA（头部浏览器）
-      #   [2] patchright           → bypass.city Turnstile（主方案）
-      #   [3] Playwright + NopeCHA → bypass.city Turnstile（备用方案）
-      # 实例 [2][3] 在独立进程中启动，与 [1] 互不干扰
+      # patchright headed 模式需要 xvfb-run 提供虚拟显示
       # =========================
       - name: 运行 restore.js
         env:
-          MAGMA_USERNAME:    ${{ secrets.MAGMA_USERNAME }}
+          MAGMA_USERNAME: ${{ secrets.MAGMA_USERNAME }}
           MAGMA_PASSWORD: ${{ secrets.MAGMA_PASSWORD }}
-          TG_TOKEN:     ${{ secrets.TG_TOKEN }}
-          TG_CHAT_ID:   ${{ secrets.TG_CHAT_ID }}
-          MAX_RETRY:    "3"
+          TG_TOKEN:       ${{ secrets.TG_TOKEN }}
+          TG_CHAT_ID:     ${{ secrets.TG_CHAT_ID }}
+          MAX_RETRY:      "3"
         run: |
           mkdir -p scripts/screenshots
           xvfb-run --auto-servernum \
@@ -128,7 +97,7 @@ jobs:
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: teo-screenshots-${{ github.run_id }}
+          name: magmanode-screenshots-${{ github.run_id }}
           path: scripts/screenshots/
           if-no-files-found: warn
           retention-days: 7
