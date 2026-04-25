@@ -3,7 +3,7 @@ name: Magmanode Restore
 on:
   workflow_dispatch:
   schedule:
-    - cron: "15 1 */28 * *"
+    - cron: "15 */2 * * *"
 
 jobs:
   run:
